@@ -1,17 +1,109 @@
 # Importa todas as chamadas do tKinter
 from tkinter import * 
 from tkinter import ttk
+import sqlite3
 
 # Janela do sistema
 root = Tk()
 
 class Funcs():
-    def limpar_tela(self):
+    def limpar_cliente(self):
         self.codigo_entry.delete(0, END)
         self.nome_entry.delete(0, END)
         self.fone_entry.delete(0, END)
         self.cidade_entry.delete(0, END)
 
+    def conecta_db(self):
+        self.conn = sqlite3.connect('clientes.db')
+        self.cursor = self.conn.cursor(); print('Conectando ao banco de dados')
+
+    def desconecta_db(self):
+        self.conn.close(); print('Desconectando do Banco de dados')
+
+    def montaTabelas(self):
+        self.conecta_db(); print('Conectando banco de dados (tabela)')
+        ### Criando tabela
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS clientes (
+                cod INTEGER PRIMARY KEY,
+                nome_cliente CHAR(40) NOT NULL,
+                telefone INTEGER(20),
+                cidade CHAR(40)
+            );
+        """)
+        self.conn.commit(); print('Banco de dados criado')
+        self.desconecta_db()
+
+    def variaveis(self):
+        self.codigo = self.codigo_entry.get()
+        self.nome = self.nome_entry.get()
+        self.fone = self.fone_entry.get()
+        self.cidade = self.cidade_entry.get()
+
+    def add_cliente(self):
+        self.variaveis()
+        self.conecta_db()
+
+        self.cursor.execute(""" INSERT INTO clientes (nome_cliente, telefone, cidade)
+                            VALUES (?, ?, ?)""", (self.nome, self.fone, self.cidade))
+        self.conn.commit()
+        self.desconecta_db()
+        self.select_lista()
+        self.limpar_cliente()
+
+    def select_lista(self):
+        self.listaCli.delete(*self.listaCli.get_children())
+        self.conecta_db()
+        lista = self.cursor.execute(""" SELECT cod, nome_cliente, telefone, cidade FROM clientes
+                                    ORDER BY nome_cliente ASC; """)
+        for i in lista:
+            self.listaCli.insert("", END, values=i)
+        self.desconecta_db()
+
+    def OnDoubleClick(self, event):
+        self.limpar_cliente()
+        self.listaCli.selection()
+
+        for n in self.listaCli.selection():
+            col1, col2, col3, col4 = self.listaCli.item(n, 'values')
+            self.codigo_entry.insert(END, col1)
+            self.nome_entry.insert(END, col2)
+            self.fone_entry.insert(END, col3)
+            self.cidade_entry.insert(END, col4)
+
+    def deleta_cliente(self):
+        self.variaveis()
+        self.conecta_db()
+        self.cursor.execute(""" DELETE FROM clientes WHERE cod = ? """, (self.codigo))
+        self.conn.commit()
+        self.desconecta_db()
+        self.limpar_cliente()
+        self.select_lista()
+
+    def altera_cliente(self):
+        self.variaveis()
+        self.conecta_db()
+        self.cursor.execute(""" UPDATE clientes SET nome_cliente = ?, telefone = ?, cidade = ?
+            WHERE cod = ? """, (self.nome, self.fone, self.cidade, self.codigo))
+        self.conn.commit()
+        self.desconecta_db()
+        self.select_lista()
+        self.limpar_cliente()
+
+    def busca_cliente(self):
+        self.conecta_db()
+        self.listaCli.delete(*self.listaCli.get_children())
+
+        self.nome_entry.insert(END, '%')
+        nome = self.nome_entry.get()
+        self.cursor.execute(
+            """ SELECT cod, nome_cliente, telefone, cidade FROM clientes
+             WHERE nome_cliente LIKE '%s' ORDER BY nome_cliente ASC""" % nome)
+        buscanomeCli = self.cursor.fetchall()
+        for i in buscanomeCli:
+            self.listaCli.insert("", END, values= i)
+        self.limpar_cliente()
+        self.desconecta_db()
 
 class Application(Funcs):
     def __init__(self):
@@ -20,6 +112,9 @@ class Application(Funcs):
         self.frames_da_tela()
         self.widgets_frame1()
         self.lista_frame2()
+        self.montaTabelas()
+        self.select_lista()
+        self.Menus()
 
         # cria um loop que faz com que a tela apareça
         root.mainloop()
@@ -45,27 +140,27 @@ class Application(Funcs):
     def widgets_frame1(self):
         ### Criação do botao limpar
         self.bt_limpar = Button(self.frame_1, text= 'Limpar', bd= 2, bg= "#2aa5ec", fg= "#FFFFFF"
-                                ,font= ('verdana', 8, 'bold'), command= self.limpar_tela)
+                                ,font= ('verdana', 8, 'bold'), command= self.limpar_cliente)
         self.bt_limpar.place(relx= 0.2, rely= 0.1, relwidth= 0.1, relheight= 0.15)
 
          ### Criação do botao buscar
         self.bt_buscar = Button(self.frame_1, text= 'Buscar', bd= 3, bg= "#2aa5ec", fg= "#FFFFFF"
-                                ,font= ('verdana', 8, 'bold'))
+                                ,font= ('verdana', 8, 'bold'), command= self.busca_cliente)
         self.bt_buscar.place(relx= 0.3, rely= 0.1, relwidth= 0.1, relheight= 0.15)
 
         ### Criação do botao novo
         self.bt_novo = Button(self.frame_1, text= 'Novo', bd= 2, bg= "#2aa5ec", fg= "#FFFFFF"
-                                ,font= ('verdana', 8, 'bold'))
+                                ,font= ('verdana', 8, 'bold'), command= self.add_cliente)
         self.bt_novo.place(relx= 0.6, rely= 0.1, relwidth= 0.1, relheight= 0.15)
 
         ### Criação do botao alterar
         self.bt_alterar = Button(self.frame_1, text= 'Alterar', bd= 2, bg= "#2aa5ec", fg= "#FFFFFF"
-                                ,font= ('verdana', 8, 'bold'))
+                                ,font= ('verdana', 8, 'bold'), command= self.altera_cliente)
         self.bt_alterar.place(relx= 0.7, rely= 0.1, relwidth= 0.1, relheight= 0.15)
 
         ### Criação do botao apagar
         self.bt_apagar = Button(self.frame_1, text= 'Apagar', bd= 3, bg= "#2aa5ec", fg= "#FFFFFF"
-                                ,font= ('verdana', 8, 'bold'))
+                                ,font= ('verdana', 8, 'bold'), command= self.deleta_cliente)
         self.bt_apagar.place(relx= 0.8, rely= 0.1, relwidth= 0.1, relheight= 0.15)
 
         ## Criação da label e entrada do codigo
@@ -116,5 +211,20 @@ class Application(Funcs):
         self.scroolLista = Scrollbar(self.frame_2, orient= 'vertical')
         self.listaCli.configure(yscroll=self.scroolLista.set)
         self.scroolLista.place(relx= 0.97, rely= 0.08, relwidth= 0.02, relheight= 0.85)
+        self.listaCli.bind("<Double-1>", self.OnDoubleClick)
+
+    def Menus(self):
+        menubar = Menu(self.root)
+        self.root.config(menu= menubar)
+        filemenu = Menu(menubar)
+        filemenu2 = Menu(menubar)
+
+        def Quit(): self.root.destroy()
+        
+        menubar.add_cascade(label= "Opções", menu= filemenu)
+        menubar.add_cascade(label= "Relatorios", menu= filemenu2)
+
+        filemenu.add_command(label= "Sair", command= Quit)
+        filemenu.add_command(label= "limpa Cliente", command= self.limpar_cliente)
 
 Application()
